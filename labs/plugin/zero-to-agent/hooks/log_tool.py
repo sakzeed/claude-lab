@@ -28,7 +28,7 @@ def main() -> int:
 
     command = tool_input.get("command", "") if tool == "Bash" else ""
     if re.search(r"\brm\s+-(?:[a-zA-Z]*r[a-zA-Z]*f|[a-zA-Z]*f[a-zA-Z]*r)\b", command):
-        print("claude-lab hook: blocked `rm -rf` — delete files one by one or ask the user", file=sys.stderr)
+        print("zero-to-agent hook: blocked `rm -rf` — delete files one by one or ask the user", file=sys.stderr)
         return 2
     return 0
 
