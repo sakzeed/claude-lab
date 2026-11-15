@@ -77,6 +77,16 @@ class TestMcpServer(unittest.TestCase):
         self.assertIsNone(replies[0]["id"])
         self.assertEqual(replies[1], {"jsonrpc": "2.0", "id": 5, "result": {}})
 
+    def test_bad_params_keep_running(self):
+        replies, _, _ = talk(
+            req(1, "tools/call", ["not", "an", "object"]),
+            req(2, "tools/call", {"name": "calculator", "arguments": "2+2"}),
+            req(3, "ping"),
+        )
+        self.assertEqual(replies[0]["error"]["code"], -32602)
+        self.assertEqual(replies[1]["error"]["code"], -32602)
+        self.assertEqual(replies[2]["result"], {})
+
     def test_notification_no_reply(self):
         replies, _, _ = talk(INITIALIZED)
         self.assertEqual(replies, [])

@@ -24,7 +24,7 @@ import sys
 SERVER_INFO = {"name": "claude-lab", "version": "0.1.0"}
 SUPPORTED = ["2025-06-18", "2025-03-26", "2024-11-05"]
 
-PARSE_ERROR, METHOD_NOT_FOUND, INVALID_PARAMS = -32700, -32601, -32602
+PARSE_ERROR, METHOD_NOT_FOUND, INVALID_PARAMS, INTERNAL_ERROR = -32700, -32601, -32602, -32603
 
 
 def log(message: str) -> None:
@@ -119,8 +119,11 @@ def _tools_call(params: dict) -> dict:
     if name not in TOOLS:
         raise RpcError(INVALID_PARAMS, f"unknown tool: {name}")
     fn, _ = TOOLS[name]
+    arguments = params.get("arguments") or {}
+    if not isinstance(arguments, dict):
+        raise RpcError(INVALID_PARAMS, "arguments must be an object")
     try:
-        text, is_error = fn(params.get("arguments") or {}), False
+        text, is_error = fn(arguments), False
     except Exception as exc:  # a tool failure is a *result* the model can read
         text, is_error = f"{type(exc).__name__}: {exc}", True
     log(f"tools/call {name} -> {'error' if is_error else 'ok'}")
@@ -144,11 +147,19 @@ def handle(msg: dict) -> dict | None:
             if not is_request:
                 return None  # e.g. notifications/initialized
             raise RpcError(METHOD_NOT_FOUND, f"method not found: {method}")
-        result = METHODS[method](msg.get("params") or {})
+        params = msg.get("params") or {}
+        if not isinstance(params, dict):
+            raise RpcError(INVALID_PARAMS, "params must be an object")
+        result = METHODS[method](params)
     except RpcError as exc:
         if not is_request:
             return None
         return {"jsonrpc": "2.0", "id": msg["id"], "error": {"code": exc.code, "message": str(exc)}}
+    except Exception as exc:  # a bug in a handler must not kill the server
+        log(f"internal error in {method}: {exc!r}")
+        if not is_request:
+            return None
+        return {"jsonrpc": "2.0", "id": msg["id"], "error": {"code": INTERNAL_ERROR, "message": "internal error"}}
     if not is_request:
         return None
     return {"jsonrpc": "2.0", "id": msg["id"], "result": result}

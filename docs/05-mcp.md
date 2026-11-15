@@ -95,15 +95,25 @@ def handle(msg: dict) -> dict | None:
             if not is_request:
                 return None  # e.g. notifications/initialized
             raise RpcError(METHOD_NOT_FOUND, f"method not found: {method}")
-        result = METHODS[method](msg.get("params") or {})
+        params = msg.get("params") or {}
+        if not isinstance(params, dict):
+            raise RpcError(INVALID_PARAMS, "params must be an object")
+        result = METHODS[method](params)
     except RpcError as exc:
         if not is_request:
             return None
         return {"jsonrpc": "2.0", "id": msg["id"], "error": {"code": exc.code, "message": str(exc)}}
+    except Exception as exc:  # a bug in a handler must not kill the server
+        log(f"internal error in {method}: {exc!r}")
+        if not is_request:
+            return None
+        return {"jsonrpc": "2.0", "id": msg["id"], "error": {"code": INTERNAL_ERROR, "message": "internal error"}}
     if not is_request:
         return None
     return {"jsonrpc": "2.0", "id": msg["id"], "result": result}
 ```
+
+สองชั้นที่กันไม่ให้ server ตาย: `params` ที่ไม่ใช่ object ได้ `-32602` และ bug ใด ๆ ใน handler ได้ `-32603` (internal error) แทนการ crash (test `test_bad_params_keep_running`)
 
 `initialize` ตอบ `protocolVersion` ที่ client ขอ ถ้า server รองรับ (มีรายการใน `SUPPORTED`) ไม่งั้นตอบเวอร์ชันล่าสุดที่ตัวเองมี แล้วให้ client ตัดสินใจเองว่าจะคุยต่อไหม
 
