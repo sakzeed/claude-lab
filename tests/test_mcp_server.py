@@ -59,6 +59,10 @@ class TestMcpServer(unittest.TestCase):
         self.assertNotIn("error", r)
         self.assertTrue(r["result"]["isError"])
 
+    def test_huge_power_is_error_not_hang(self):
+        replies, _, _ = talk(INIT, req(2, "tools/call", {"name": "calculator", "arguments": {"expression": "9**9**9"}}), timeout=5)
+        self.assertTrue(replies[-1]["result"]["isError"])
+
     def test_unknown_tool_is_invalid_params(self):
         replies, _, _ = talk(INIT, req(2, "tools/call", {"name": "nope", "arguments": {}}))
         self.assertEqual(replies[-1]["error"]["code"], -32602)

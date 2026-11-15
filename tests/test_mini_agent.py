@@ -92,6 +92,12 @@ class TestTools(unittest.TestCase):
             with self.assertRaises(ValueError, msg=expr):
                 calculator.run({"expression": expr})
 
+    def test_calculator_rejects_huge_power(self):
+        # 2**10**10 would run for minutes and hang the agent (or the MCP server)
+        with self.assertRaises(ValueError):
+            calculator.run({"expression": "2**10**10"})
+        self.assertEqual(calculator.run({"expression": "2**10"}), "1024")
+
     def test_count_lines(self):
         with tempfile.NamedTemporaryFile("w", delete=False, suffix=".txt") as f:
             f.write("a\nb\nc\n")

@@ -12,9 +12,19 @@ _BINOPS = {
     ast.Mult: operator.mul,
     ast.Div: operator.truediv,
     ast.Mod: operator.mod,
-    ast.Pow: operator.pow,
+    ast.Pow: None,
 }
 _UNARY = {ast.UAdd: operator.pos, ast.USub: operator.neg}
+
+
+MAX_EXPONENT = 100
+
+
+def _pow(base, exponent):
+    # 2**10**10 would keep the CPU busy for minutes: a model could hang us.
+    if abs(exponent) > MAX_EXPONENT:
+        raise ValueError(f"exponent too large (max {MAX_EXPONENT})")
+    return base ** exponent
 
 
 def _eval(node: ast.AST):
@@ -25,7 +35,10 @@ def _eval(node: ast.AST):
     if isinstance(node, ast.Constant) and type(node.value) in (int, float):
         return node.value
     if isinstance(node, ast.BinOp) and type(node.op) in _BINOPS:
-        return _BINOPS[type(node.op)](_eval(node.left), _eval(node.right))
+        left, right = _eval(node.left), _eval(node.right)
+        if isinstance(node.op, ast.Pow):
+            return _pow(left, right)
+        return _BINOPS[type(node.op)](left, right)
     if isinstance(node, ast.UnaryOp) and type(node.op) in _UNARY:
         return _UNARY[type(node.op)](_eval(node.operand))
     raise ValueError(f"not allowed in calculator: {ast.dump(node)[:60]}")
