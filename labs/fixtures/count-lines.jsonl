@@ -1,0 +1,9 @@
+{"type": "system", "subtype": "init", "cwd": "<cwd>", "model": "<model>", "tools": ["Bash", "Read"], "agents": ["claude", "Explore", "general-purpose", "Plan", "statusline-setup"], "permissionMode": "dontAsk", "claude_code_version": "2.1.325"}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "tool_use", "id": "toolu_0136UJhEP8i3cBoZuSSp5JcE", "name": "Bash", "input": {"command": "wc -l notes.txt", "description": "Count lines in notes.txt"}}], "usage": {"input_tokens": 2, "output_tokens": 16, "cache_creation_input_tokens": 2656, "cache_read_input_tokens": 3002}}}
+{"type": "system", "subtype": "task_summary"}
+{"type": "user", "message": {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "toolu_0136UJhEP8i3cBoZuSSp5JcE", "content": "5 notes.txt", "is_error": false}]}}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "thinking"}], "usage": {"input_tokens": 2, "output_tokens": 8, "cache_creation_input_tokens": 97, "cache_read_input_tokens": 5658}}}
+{"type": "assistant", "message": {"role": "assistant", "content": [{"type": "text", "text": "`notes.txt` has 5 lines."}], "usage": {"input_tokens": 2, "output_tokens": 8, "cache_creation_input_tokens": 97, "cache_read_input_tokens": 5658}}}
+{"type": "system", "subtype": "post_turn_summary"}
+{"type": "result", "subtype": "success", "is_error": false, "num_turns": 2, "stop_reason": "end_turn", "duration_ms": 9434, "result": "`notes.txt` has 5 lines.", "usage": {"input_tokens": 4, "output_tokens": 134, "cache_creation_input_tokens": 2753, "cache_read_input_tokens": 8660}}
+{"type": "system", "subtype": "task_summary"}
