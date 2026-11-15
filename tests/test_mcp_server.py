@@ -1,0 +1,88 @@
+import json
+import pathlib
+import subprocess
+import sys
+import unittest
+
+SERVER = pathlib.Path(__file__).resolve().parent.parent / "labs" / "mcp_server" / "server.py"
+
+
+def talk(*lines: str, timeout: float = 10) -> tuple[list[dict], str, str]:
+    """Send raw lines to a fresh server; return (parsed replies, raw stdout, stderr)."""
+    proc = subprocess.run(
+        [sys.executable, str(SERVER)],
+        input="".join(line + "\n" for line in lines),
+        capture_output=True, text=True, timeout=timeout,
+    )
+    replies = [json.loads(l) for l in proc.stdout.splitlines() if l.strip()]
+    return replies, proc.stdout, proc.stderr
+
+
+def req(id_, method, params=None):
+    msg = {"jsonrpc": "2.0", "id": id_, "method": method}
+    if params is not None:
+        msg["params"] = params
+    return json.dumps(msg)
+
+
+INIT = req(1, "initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "test", "version": "0"}})
+INITIALIZED = json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"})
+
+
+class TestMcpServer(unittest.TestCase):
+    def test_initialize(self):
+        (r,), _, _ = talk(INIT)
+        self.assertEqual(r["id"], 1)
+        self.assertEqual(r["result"]["protocolVersion"], "2025-06-18")
+        self.assertEqual(r["result"]["serverInfo"]["name"], "claude-lab")
+        self.assertIn("tools", r["result"]["capabilities"])
+
+    def test_initialize_unknown_version_falls_back(self):
+        (r,), _, _ = talk(req(1, "initialize", {"protocolVersion": "1999-01-01"}))
+        self.assertEqual(r["result"]["protocolVersion"], "2025-06-18")
+
+    def test_tools_list(self):
+        replies, _, _ = talk(INIT, INITIALIZED, req(2, "tools/list"))
+        tools = {t["name"]: t for t in replies[-1]["result"]["tools"]}
+        self.assertEqual(set(tools), {"calculator", "count_lines"})
+        self.assertEqual(tools["calculator"]["inputSchema"]["required"], ["expression"])
+
+    def test_tools_call_calculator(self):
+        replies, _, _ = talk(INIT, req(2, "tools/call", {"name": "calculator", "arguments": {"expression": "6*7"}}))
+        result = replies[-1]["result"]
+        self.assertEqual(result["content"], [{"type": "text", "text": "42"}])
+        self.assertFalse(result["isError"])
+
+    def test_tool_error_is_result(self):
+        replies, _, _ = talk(INIT, req(2, "tools/call", {"name": "calculator", "arguments": {"expression": "__import__('os')"}}))
+        r = replies[-1]
+        self.assertNotIn("error", r)
+        self.assertTrue(r["result"]["isError"])
+
+    def test_unknown_tool_is_invalid_params(self):
+        replies, _, _ = talk(INIT, req(2, "tools/call", {"name": "nope", "arguments": {}}))
+        self.assertEqual(replies[-1]["error"]["code"], -32602)
+
+    def test_unknown_method(self):
+        replies, _, _ = talk(INIT, req(2, "resources/list"))
+        self.assertEqual(replies[-1]["error"]["code"], -32601)
+
+    def test_parse_error_keeps_running(self):
+        replies, _, _ = talk("this is not json", req(5, "ping"))
+        self.assertEqual(replies[0]["error"]["code"], -32700)
+        self.assertIsNone(replies[0]["id"])
+        self.assertEqual(replies[1], {"jsonrpc": "2.0", "id": 5, "result": {}})
+
+    def test_notification_no_reply(self):
+        replies, _, _ = talk(INITIALIZED)
+        self.assertEqual(replies, [])
+
+    def test_stdout_only_jsonrpc(self):
+        _, stdout, stderr = talk(INIT, INITIALIZED, req(2, "tools/list"), "garbage", req(3, "ping"))
+        for line in stdout.splitlines():
+            self.assertEqual(json.loads(line)["jsonrpc"], "2.0")
+        self.assertIn("claude-lab", stderr)  # logs go to stderr
+
+
+if __name__ == "__main__":
+    unittest.main()
