@@ -1,0 +1,24 @@
+# secrets & runtime artifacts — never commit
+service.json
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+.env
+.env.*
+*.log
+
+# build output & local tooling
+site/
+.cache/
+venv/
+.venv/
+__pycache__/
+
+# os / editor
+.DS_Store
+*.swp
+/labs/labps/labps
+
+# agent workspace
+.superpowers/

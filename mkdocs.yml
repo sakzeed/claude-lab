@@ -1,0 +1,56 @@
+site_name: Claude Lab
+site_description: เข้าใจ AI, agent, MCP, SKILL.md และ plugin แบบ zero to hero ภาษาไทย — ลงมือจริงด้วย Python stdlib และ Claude Code
+site_url: https://sakzeed.github.io/claude-lab/
+repo_url: https://github.com/sakzeed/claude-lab
+repo_name: sakzeed/claude-lab
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: th
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: สลับเป็นโหมดมืด
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: สลับเป็นโหมดสว่าง
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.inlinehilite
+
+nav:
+  - หน้าแรก: index.md
+  - 1. LLM ทำงานยังไง: 01-llm-basics.md
+  - 2. tool use — model ขอ โปรแกรมทำ: 02-tool-use.md
+  - 3. agent loop: 03-agent-loop.md
+  - 4. context และ subagent: 04-context-subagents.md
+  - 5. MCP: 05-mcp.md
+  - 6. SKILL.md: 06-skills.md
+  - 7. hooks: 07-hooks.md
+  - 8. plugins: 08-plugins.md
