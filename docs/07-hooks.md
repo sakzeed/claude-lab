@@ -57,26 +57,47 @@ Claude Code ส่ง event เป็น JSON ทาง **stdin** แล้ว�
 | อื่น ๆ | error ที่ไม่บล็อก (แสดงเป็นคำเตือน) |
 
 ```python
+# rm with both -r/-R and -f in one flag group, in any order: -rf -fr -Rf -rfv ...
+RM_RF = re.compile(r"\brm\s+-(?=[a-zA-Z]*[rR])(?=[a-zA-Z]*f)[a-zA-Z]+")
+
+
+def blocked(tool: str, tool_input: dict) -> bool:
+    command = tool_input.get("command", "") if tool == "Bash" else ""
+    return isinstance(command, str) and bool(RM_RF.search(command))
+
+
+def log(tool: str, tool_input: dict) -> None:
+    try:
+        log_dir = pathlib.Path.home() / ".claude-lab"
+        log_dir.mkdir(exist_ok=True)
+        entry = {"time": datetime.datetime.now().isoformat(timespec="seconds"), "tool": tool, "input": tool_input}
+        with open(log_dir / "tool-log.jsonl", "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError as exc:
+        print(f"zero-to-agent hook: could not write log: {exc}", file=sys.stderr)
+
+
 def main() -> int:
     try:
         event = json.load(sys.stdin)
     except ValueError:
         return 0  # never block on input we do not understand
-    tool = event.get("tool_name", "")
-    tool_input = event.get("tool_input") or {}
+    if not isinstance(event, dict):
+        return 0
+    tool = str(event.get("tool_name", ""))
+    tool_input = event.get("tool_input")
+    if not isinstance(tool_input, dict):
+        tool_input = {}
 
-    log_dir = pathlib.Path.home() / ".claude-lab"
-    log_dir.mkdir(exist_ok=True)
-    entry = {"time": datetime.datetime.now().isoformat(timespec="seconds"), "tool": tool, "input": tool_input}
-    with open(log_dir / "tool-log.jsonl", "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-
-    command = tool_input.get("command", "") if tool == "Bash" else ""
-    if re.search(r"\brm\s+-(?:[a-zA-Z]*r[a-zA-Z]*f|[a-zA-Z]*f[a-zA-Z]*r)\b", command):
+    if blocked(tool, tool_input):
+        log(tool, tool_input)
         print("zero-to-agent hook: blocked `rm -rf` — delete files one by one or ask the user", file=sys.stderr)
         return 2
+    log(tool, tool_input)
     return 0
 ```
+
+ลำดับสำคัญ: **ตรวจก่อน log** และ log ที่เขียนไม่ได้ (ดิสก์เต็ม, `HOME` เขียนไม่ได้) ต้องไม่ทำให้การบล็อกหลุด — ถ้า hook crash จะได้ exit code อื่นที่ไม่ใช่ 2 ซึ่ง Claude Code ถือว่า "error ที่ไม่บล็อก" แล้วรันคำสั่งต่อ guardrail ที่พังแล้วปล่อยผ่าน (fail open) ไม่ใช่ guardrail (test `test_hook_blocks_even_if_log_fails`)
 
 เพราะเป็นโปรแกรมธรรมดา จึงทดสอบได้โดยไม่ต้องมี Claude เลย:
 
@@ -98,9 +119,14 @@ $ cat ~/.claude-lab/tool-log.jsonl
 !!! warning "hook รันด้วยสิทธิ์ของคุณเต็ม ๆ"
     hook ไม่ได้อยู่ใน sandbox — มันคือคำสั่งที่รันบนเครื่องคุณทุกครั้งที่เกิด event ติดตั้ง plugin ที่มี hook จากคนอื่นจึงเท่ากับยอมให้โค้ดของเขารันบนเครื่อง อ่าน `hooks.json` และสคริปต์ก่อนเสมอ
 
+    hook ตัวนี้ยังเก็บ **ทุกคำสั่ง Bash** ไว้ใน `~/.claude-lab/tool-log.jsonl` แบบไม่มีวันหมดอายุ — ถ้าเคยพิมพ์ token หรือรหัสผ่านไว้ในคำสั่ง มันจะอยู่ในไฟล์นี้ด้วย ลบไฟล์เมื่อเลิกทดลอง
+
 ## 7.4 hook ทำงานจริงใน session
 
-สั่งให้ Claude นับบรรทัดผ่าน subagent ของ plugin แล้วลบโฟลเดอร์ด้วย `rm -rf` (โหลด plugin ด้วย `--plugin-dir`, fixture: `labs/fixtures/agent-hook.jsonl`):
+สั่งให้ Claude นับบรรทัดผ่าน subagent ของ plugin แล้วลบโฟลเดอร์ด้วย `rm -rf` (โหลด plugin ด้วย `--plugin-dir`, fixture: `labs/fixtures/agent-hook.jsonl`)
+
+!!! warning "ลองในโฟลเดอร์ทิ้งได้เท่านั้น"
+    คำสั่งนี้อนุญาต `Bash(rm *)` ถ้า path ใน `--plugin-dir` ผิด (เช่น clone ไว้ที่อื่น) plugin จะไม่ถูกโหลด และ `rm -rf old-build` จะ **รันจริง** — ใช้ path ที่ clone ไว้จริงของคุณ และรันในโฟลเดอร์ทดลองที่ไม่มีอะไรสำคัญ
 
 ```sh
 $ claude -p "First use the file-stats subagent to count lines in the .txt files here. Then delete the old-build folder with: rm -rf old-build" \
@@ -147,7 +173,7 @@ This hook comes from the zero-to-agent@inline plugin.
 ```
 
 !!! note "hook ไม่ใช่กำแพงที่สมบูรณ์"
-    regex ของเราจับ `rm -rf` และ `rm -fr` แต่ไม่จับ `rm -r -f`, `find . -delete` หรือ Python ที่ลบไฟล์ hook ที่ดีจึงใช้เป็น "ราวกันตก" ร่วมกับ permission ไม่ใช่ใช้แทน
+    regex ของเราจับ `rm -rf`, `rm -fr`, `rm -Rf`, `rm -rfv` แต่ไม่จับ `rm -r -f`, `rm --recursive --force`, `find . -delete` หรือ Python ที่ลบไฟล์ hook ที่ดีจึงใช้เป็น "ราวกันตก" ร่วมกับ permission ไม่ใช่ใช้แทน
 
 ## 7.5 แบบฝึกหัด 3 ข้อ + เช็คความเข้าใจ 2 ข้อ
 

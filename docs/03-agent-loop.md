@@ -71,7 +71,7 @@ $ claude -p "How many lines are in notes.txt? Use a tool to check, then answer i
 {"type": "result", "subtype": "success", "num_turns": 2, "stop_reason": "end_turn", "result": "`notes.txt` has 5 lines."}
 ```
 
-(ตัด field `usage` และ event `system` ที่เป็นแค่สถานะออกเพื่อให้อ่านง่าย)
+(ย่อเพื่อให้อ่านง่าย: ตัด field `usage`, `agents` ใน init, `is_error` กับ `duration_ms` ใน result และ event `system` ที่เป็นแค่สถานะ — ไฟล์เต็มอยู่ใน fixture)
 
 รูปร่าง **เหมือนกับ mini_agent ทุกอย่าง**: `tool_use` จาก assistant → `tool_result` จาก user → assistant ตอบ → จบ
 

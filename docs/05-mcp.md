@@ -2,7 +2,7 @@
 
 บทที่ 2–4 tool ทั้งหมดเป็นของที่ Claude Code มีอยู่แล้ว (`Bash`, `Read`, `Agent`) ถ้าอยากเพิ่ม tool ของเราเองล่ะ? **MCP (Model Context Protocol)** คือมาตรฐานกลางที่ให้โปรแกรมใดก็ได้ประกาศว่า "ฉันมี tool เหล่านี้" แล้ว agent ตัวไหนที่พูด MCP ได้ก็ใช้ได้ทันที
 
-บทนี้เขียน MCP server เองด้วย Python stdlib ล้วน (ไม่ใช้ SDK) จึงเห็นทุกข้อความที่วิ่งไปมา โค้ดอยู่ที่ `labs/mcp_server/server.py` ประมาณ 170 บรรทัด
+บทนี้เขียน MCP server เองด้วย Python stdlib ล้วน (ไม่ใช้ SDK) จึงเห็นทุกข้อความที่วิ่งไปมา โค้ดอยู่ที่ `labs/mcp_server/server.py` ราว 202 บรรทัด
 
 ---
 
@@ -63,7 +63,7 @@ $ printf '%s\n' \
 
 - **notification (`notifications/initialized`) ไม่มีคำตอบ** — 7 ข้อความเข้า แต่มี 6 คำตอบ
 - **tool พัง ≠ protocol พัง** — `id 4` เป็น `result` ที่ `isError: true` (model อ่านแล้วแก้ตัวได้ เหมือนบทที่ 2) ส่วน `error` ของ JSON-RPC ใช้กับความผิดระดับ protocol เท่านั้น
-- **ขยะ (`hello?`) ไม่ทำให้ server ตาย** — ตอบ `-32700` แล้วรับข้อความถัดไปต่อ
+- **ขยะ (`hello?`) ไม่ทำให้ server ตาย** — ตอบ `-32700` แล้วรับข้อความถัดไปต่อ (รวมถึง JSON ที่ซ้อนลึกเป็นแสนชั้น และ byte ที่ไม่ใช่ UTF-8 — server อ่าน stdin เป็น byte แล้ว decode เอง; test `test_deeply_nested_json_keeps_running`, `test_invalid_utf8_keeps_running`)
 - **บรรทัดที่ขึ้นต้นด้วย `[claude-lab]` มาจาก stderr** — ลองดูว่า stdout มีแต่ JSON-RPC จริงไหม:
 
 ```sh
@@ -162,7 +162,7 @@ $ claude -p "Use the claude-lab calculator tool to compute (120+80)*3/7, then an
 
 - tool จาก MCP ถูกตั้งชื่อเป็น **`mcp__<server>__<tool>`** เพื่อไม่ให้ชนกับ tool อื่น และใช้ชื่อนี้ใน `--allowedTools`
 - `tools=` ใน init มีแค่ tool ของเราสองตัว — Claude Code เรียก `tools/list` แล้วแปลงเป็นรายการ tool ให้ model (รูปแบบเดียวกับ `Tool.schema()` ในบทที่ 2)
-- input token น้อยกว่าบทที่ 3 (7,234 เทียบกับ 11,413) เพราะปิด tool ในตัวทั้งหมด — คำอธิบาย tool ทุกตัวกิน context
+- input token น้อยกว่าบทที่ 3 (7,234 เทียบกับ 11,413) ทั้งที่ทั้งสองครั้งมี tool แค่ 2 ตัว — บทที่ 3 คือ `Bash` กับ `Read` ซึ่งมีคำอธิบายในตัวยาว ส่วนที่นี่คือ tool ของเราที่คำอธิบายสั้นบรรทัดเดียว คำอธิบาย tool ทุกตัวกิน context
 
 ลบออกเมื่อเลิกใช้:
 
