@@ -1,4 +1,5 @@
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -7,13 +8,14 @@ import unittest
 SERVER = pathlib.Path(__file__).resolve().parent.parent / "labs" / "mcp_server" / "server.py"
 
 
-def talk(*lines: str, timeout: float = 10) -> tuple[list[dict], str, str]:
-    """Send raw lines to a fresh server; return (parsed replies, raw stdout, stderr)."""
+def talk(*lines, timeout: float = 10, env=None) -> tuple[list[dict], str, str]:
+    """Send raw lines (str or bytes) to a fresh server; return (replies, stdout, stderr)."""
+    data = b"".join((l if isinstance(l, bytes) else l.encode()) + b"\n" for l in lines)
     proc = subprocess.run(
-        [sys.executable, str(SERVER)],
-        input="".join(line + "\n" for line in lines),
-        capture_output=True, text=True, timeout=timeout,
+        [sys.executable, str(SERVER)], input=data, capture_output=True, timeout=timeout,
+        env={**os.environ, **(env or {})},
     )
+    proc.stdout, proc.stderr = proc.stdout.decode(), proc.stderr.decode(errors="replace")
     replies = [json.loads(l) for l in proc.stdout.splitlines() if l.strip()]
     return replies, proc.stdout, proc.stderr
 
@@ -86,6 +88,16 @@ class TestMcpServer(unittest.TestCase):
         self.assertEqual(replies[0]["error"]["code"], -32602)
         self.assertEqual(replies[1]["error"]["code"], -32602)
         self.assertEqual(replies[2]["result"], {})
+
+    def test_deeply_nested_json_keeps_running(self):
+        replies, _, _ = talk("[" * 200000, req(6, "ping"))
+        self.assertEqual(replies[0]["error"]["code"], -32700)
+        self.assertEqual(replies[-1]["id"], 6)
+
+    def test_invalid_utf8_keeps_running(self):
+        replies, _, _ = talk(b"\xff\xfe not utf-8", req(7, "ping"), env={"PYTHONIOENCODING": "utf-8:strict"})
+        self.assertEqual(replies[0]["error"]["code"], -32700)
+        self.assertEqual(replies[-1]["id"], 7)
 
     def test_notification_no_reply(self):
         replies, _, _ = talk(INITIALIZED)

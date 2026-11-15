@@ -165,15 +165,30 @@ def handle(msg: dict) -> dict | None:
     return {"jsonrpc": "2.0", "id": msg["id"], "result": result}
 
 
-def serve(stdin=sys.stdin, stdout=sys.stdout) -> None:
+def _parse(line) -> dict:
+    """Decode and parse one line; raise ValueError for anything that is not a JSON object."""
+    if isinstance(line, bytes):
+        line = line.decode("utf-8")  # UnicodeDecodeError is a ValueError
+    try:
+        msg = json.loads(line)
+    except RecursionError:  # e.g. "[[[[..." nested 200k deep
+        raise ValueError("JSON nested too deeply") from None
+    if not isinstance(msg, dict):
+        raise ValueError("not an object")
+    return msg
+
+
+def serve(stdin=None, stdout=None) -> None:
+    # Read raw bytes so invalid UTF-8 becomes a parse error instead of
+    # crashing the loop (text-mode stdin raises inside "for line in stdin").
+    stdin = stdin if stdin is not None else sys.stdin.buffer
+    stdout = stdout if stdout is not None else sys.stdout
     log("ready (stdio)")
     for line in stdin:
         if not line.strip():
             continue
         try:
-            msg = json.loads(line)
-            if not isinstance(msg, dict):
-                raise ValueError("not an object")
+            msg = _parse(line)
         except ValueError as exc:
             reply = {"jsonrpc": "2.0", "id": None, "error": {"code": PARSE_ERROR, "message": f"parse error: {exc}"}}
         else:

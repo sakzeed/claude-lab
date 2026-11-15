@@ -85,6 +85,29 @@ class TestPlugin(unittest.TestCase):
             self.assertEqual(proc.returncode, 2)
             self.assertIn("rm -rf", proc.stderr)
 
+    def test_hook_blocks_variants(self):
+        with tempfile.TemporaryDirectory() as home:
+            for command in ["rm -Rf build", "rm -rfv build", "rm -fR build", "sudo rm -rf /tmp/x"]:
+                event = {"tool_name": "Bash", "tool_input": {"command": command}}
+                self.assertEqual(run_hook(event, home).returncode, 2, command)
+            ok = {"tool_name": "Bash", "tool_input": {"command": "rm notes.txt"}}
+            self.assertEqual(run_hook(ok, home).returncode, 0)
+
+    def test_hook_blocks_even_if_log_fails(self):
+        event = {"tool_name": "Bash", "tool_input": {"command": "rm -rf build"}}
+        proc = run_hook(event, "/proc/nonexistent-home")
+        self.assertEqual(proc.returncode, 2, proc.stderr)
+
+    def test_hook_allows_when_log_fails(self):
+        event = {"tool_name": "Bash", "tool_input": {"command": "ls"}}
+        self.assertEqual(run_hook(event, "/proc/nonexistent-home").returncode, 0)
+
+    def test_hook_non_dict_input_does_not_crash(self):
+        with tempfile.TemporaryDirectory() as home:
+            proc = run_hook({"tool_name": "Bash", "tool_input": "rm -rf x"}, home)
+            self.assertIn(proc.returncode, (0, 2))
+            self.assertNotIn("Traceback", proc.stderr)
+
     def test_hook_bad_input_does_not_block(self):
         with tempfile.TemporaryDirectory() as home:
             env = {**os.environ, "HOME": home}

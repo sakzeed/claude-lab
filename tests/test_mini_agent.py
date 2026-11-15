@@ -93,7 +93,7 @@ class TestTools(unittest.TestCase):
                 calculator.run({"expression": expr})
 
     def test_calculator_rejects_huge_power(self):
-        # 2**10**10 would run for minutes and hang the agent (or the MCP server)
+        # 2**10**10 would run for minutes; the cap stops the obvious case (not every slow input)
         with self.assertRaises(ValueError):
             calculator.run({"expression": "2**10**10"})
         self.assertEqual(calculator.run({"expression": "2**10"}), "1024")
