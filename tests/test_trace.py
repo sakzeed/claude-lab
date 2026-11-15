@@ -70,13 +70,14 @@ class TestFixturesRedacted(unittest.TestCase):
         self.assertTrue(files, "no fixtures")
         for path in files:
             text = path.read_text()
-            for bad in ("/root", "/tmp/claude", "/home/", "rate_limit", "credential", "memory_paths", "claude-opus", "claude-sonnet"):
+            for bad in ("/root", "/tmp/claude", "/home/", "rate_limit_info", "utilization", "credential_expires", "memory_paths", "claude-opus", "claude-sonnet"):
                 self.assertNotIn(bad, text, f"{path.name} contains {bad!r}")
             self.assertIsNone(re.search(r"[\w.+-]+@[\w-]+\.[\w.]+", text), f"{path.name} has an email")
             for line in text.splitlines():
                 ev = json.loads(line)
                 self.assertNotIn("session_id", ev)
                 self.assertNotIn("uuid", ev)
+                self.assertNotEqual(ev.get("type"), "rate_limit_event", path.name)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,8 @@
+{
+  "name": "zero-to-agent",
+  "version": "0.1.0",
+  "description": "Lab plugin from the claude-lab lessons: a skill, a subagent, a hook and a stdlib MCP server.",
+  "author": { "name": "sakzeed" },
+  "homepage": "https://sakzeed.github.io/claude-lab/",
+  "license": "MIT"
+}

@@ -12,7 +12,7 @@ One JSON message per line on stdin/stdout. stdout is the protocol channel:
 anything else printed there breaks the client, so logs go to stderr.
 
 This file is self-contained on purpose (no imports from the labs package) so
-the plugin in labs/plugin/claude-lab can ship an exact copy of it.
+the plugin in labs/plugin/zero-to-agent can ship an exact copy of it.
 """
 from __future__ import annotations
 
