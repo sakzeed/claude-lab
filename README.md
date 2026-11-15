@@ -12,7 +12,7 @@
 | `labs/mini_agent/` | agent loop + model ปลอม + tool (บท 2–3) |
 | `labs/trace/` | อ่าน `claude -p --output-format stream-json` เป็นลำดับ turn (บท 3–4) |
 | `labs/mcp_server/` | MCP server ผ่าน stdio ด้วย stdlib (บท 5) |
-| `labs/plugin/claude-lab/` | plugin: skill + subagent + hook + MCP server (บท 6–8) |
+| `labs/plugin/zero-to-agent/` | plugin: skill + subagent + hook + MCP server (บท 4–8) |
 | `labs/fixtures/` | output จริงที่ตัดข้อมูลส่วนตัวแล้ว ใช้ใน test |
 | `tests/` | `unittest` — CI ไม่ต้องเรียก `claude` |
 
