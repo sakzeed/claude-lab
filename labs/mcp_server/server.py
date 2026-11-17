@@ -19,12 +19,13 @@ from __future__ import annotations
 import ast
 import json
 import operator
+import os
 import sys
 
 SERVER_INFO = {"name": "claude-lab", "version": "0.1.0"}
 SUPPORTED = ["2025-06-18", "2025-03-26", "2024-11-05"]
 
-PARSE_ERROR, METHOD_NOT_FOUND, INVALID_PARAMS, INTERNAL_ERROR = -32700, -32601, -32602, -32603
+PARSE_ERROR, INVALID_REQUEST, METHOD_NOT_FOUND, INVALID_PARAMS, INTERNAL_ERROR = -32700, -32600, -32601, -32602, -32603
 
 
 def log(message: str) -> None:
@@ -39,12 +40,19 @@ _UNARY = {ast.UAdd: operator.pos, ast.USub: operator.neg}
 
 
 MAX_EXPONENT = 100
+MAX_RESULT_BITS = 100_000  # about 30,000 decimal digits
 
 
 def _pow(base, exponent):
     # 2**10**10 would keep the CPU busy for minutes: a model could hang us.
+    # Capping the exponent alone is not enough: ((9**99)**99)**99 uses small
+    # exponents but builds a number with millions of digits, so also cap the
+    # size of an integer result before computing it.
     if abs(exponent) > MAX_EXPONENT:
         raise ValueError(f"exponent too large (max {MAX_EXPONENT})")
+    if isinstance(base, int) and isinstance(exponent, int) and exponent > 0 and abs(base) > 1:
+        if abs(base).bit_length() * exponent > MAX_RESULT_BITS:
+            raise ValueError("result too large")
     return base ** exponent
 
 
@@ -74,7 +82,11 @@ def calculator(args: dict) -> str:
 
 
 def count_lines(args: dict) -> str:
-    with open(args["path"], encoding="utf-8", errors="replace") as f:
+    path = args["path"]
+    # only regular files: /dev/zero never ends a line, /dev/stdin would read our own input
+    if not os.path.isfile(path):
+        raise ValueError(f"not a regular file: {path}")
+    with open(path, encoding="utf-8", errors="replace") as f:
         return str(sum(1 for _ in f))
 
 
@@ -138,10 +150,16 @@ METHODS = {
 }
 
 
-def handle(msg: dict) -> dict | None:
+def handle(msg) -> dict | None:
     """Answer one request. Notifications (no "id") never get a reply."""
+    if not isinstance(msg, dict):  # e.g. a JSON-RPC batch [...] — not supported here
+        return {"jsonrpc": "2.0", "id": None, "error": {"code": INVALID_REQUEST, "message": "invalid request: expected a JSON object"}}
     is_request = "id" in msg
     method = msg.get("method")
+    if not isinstance(method, str):
+        if not is_request:
+            return None
+        return {"jsonrpc": "2.0", "id": msg["id"], "error": {"code": INVALID_REQUEST, "message": "invalid request: missing method"}}
     try:
         if method not in METHODS:
             if not is_request:
@@ -165,17 +183,14 @@ def handle(msg: dict) -> dict | None:
     return {"jsonrpc": "2.0", "id": msg["id"], "result": result}
 
 
-def _parse(line) -> dict:
-    """Decode and parse one line; raise ValueError for anything that is not a JSON object."""
+def _parse(line):
+    """Decode and parse one line; raise ValueError if it is not valid JSON."""
     if isinstance(line, bytes):
         line = line.decode("utf-8")  # UnicodeDecodeError is a ValueError
     try:
-        msg = json.loads(line)
+        return json.loads(line)
     except RecursionError:  # e.g. "[[[[..." nested 200k deep
         raise ValueError("JSON nested too deeply") from None
-    if not isinstance(msg, dict):
-        raise ValueError("not an object")
-    return msg
 
 
 def serve(stdin=None, stdout=None) -> None:

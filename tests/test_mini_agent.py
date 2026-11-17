@@ -98,6 +98,17 @@ class TestTools(unittest.TestCase):
             calculator.run({"expression": "2**10**10"})
         self.assertEqual(calculator.run({"expression": "2**10"}), "1024")
 
+    def test_calculator_rejects_huge_result(self):
+        # each exponent is <= 100, but the result would have millions of digits
+        with self.assertRaises(ValueError):
+            calculator.run({"expression": "(((9**99)**99)**99)**99"})
+        self.assertEqual(calculator.run({"expression": "(2**10)**3"}), str(2**30))
+
+    def test_count_lines_rejects_special_files(self):
+        for path in ("/dev/zero", "/dev/stdin", tempfile.gettempdir()):
+            with self.assertRaises(ValueError, msg=path):
+                count_lines.run({"path": path})
+
     def test_count_lines(self):
         with tempfile.NamedTemporaryFile("w", delete=False, suffix=".txt") as f:
             f.write("a\nb\nc\n")

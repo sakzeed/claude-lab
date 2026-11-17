@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import ast
 import operator
+import os
 
 from .agent import Tool
 
@@ -18,12 +19,19 @@ _UNARY = {ast.UAdd: operator.pos, ast.USub: operator.neg}
 
 
 MAX_EXPONENT = 100
+MAX_RESULT_BITS = 100_000  # about 30,000 decimal digits
 
 
 def _pow(base, exponent):
     # 2**10**10 would keep the CPU busy for minutes: a model could hang us.
+    # Capping the exponent alone is not enough: ((9**99)**99)**99 uses small
+    # exponents but builds a number with millions of digits, so also cap the
+    # size of an integer result before computing it.
     if abs(exponent) > MAX_EXPONENT:
         raise ValueError(f"exponent too large (max {MAX_EXPONENT})")
+    if isinstance(base, int) and isinstance(exponent, int) and exponent > 0 and abs(base) > 1:
+        if abs(base).bit_length() * exponent > MAX_RESULT_BITS:
+            raise ValueError("result too large")
     return base ** exponent
 
 
@@ -57,7 +65,11 @@ def _calculate(args: dict) -> str:
 
 
 def _count_lines(args: dict) -> str:
-    with open(args["path"], encoding="utf-8", errors="replace") as f:
+    path = args["path"]
+    # only regular files: /dev/zero never ends a line, /dev/stdin would read our own input
+    if not os.path.isfile(path):
+        raise ValueError(f"not a regular file: {path}")
+    with open(path, encoding="utf-8", errors="replace") as f:
         return str(sum(1 for _ in f))
 
 

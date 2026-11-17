@@ -99,6 +99,25 @@ class TestMcpServer(unittest.TestCase):
         self.assertEqual(replies[0]["error"]["code"], -32700)
         self.assertEqual(replies[-1]["id"], 7)
 
+    def test_huge_result_is_error_not_hang(self):
+        replies, _, _ = talk(INIT, req(2, "tools/call", {"name": "calculator", "arguments": {"expression": "(((9**99)**99)**99)**99"}}), timeout=5)
+        self.assertTrue(replies[-1]["result"]["isError"])
+
+    def test_count_lines_special_file_is_error(self):
+        replies, _, _ = talk(INIT, req(2, "tools/call", {"name": "count_lines", "arguments": {"path": "/dev/zero"}}), timeout=5)
+        self.assertTrue(replies[-1]["result"]["isError"])
+
+    def test_invalid_request(self):
+        replies, _, _ = talk(
+            "[1, 2, 3]",                                            # batch / not an object
+            json.dumps({"jsonrpc": "2.0", "id": 8}),                # no method
+            json.dumps({"jsonrpc": "2.0", "id": 9, "method": 42}),  # method not a string
+            req(10, "ping"),
+        )
+        self.assertEqual([r["error"]["code"] for r in replies[:3]], [-32600, -32600, -32600])
+        self.assertEqual([r["id"] for r in replies[:3]], [None, 8, 9])
+        self.assertEqual(replies[3]["result"], {})
+
     def test_notification_no_reply(self):
         replies, _, _ = talk(INITIALIZED)
         self.assertEqual(replies, [])
