@@ -2,7 +2,7 @@
 
 บทที่ 2–4 tool ทั้งหมดเป็นของที่ Claude Code มีอยู่แล้ว (`Bash`, `Read`, `Agent`) ถ้าอยากเพิ่ม tool ของเราเองล่ะ? **MCP (Model Context Protocol)** คือมาตรฐานกลางที่ให้โปรแกรมใดก็ได้ประกาศว่า "ฉันมี tool เหล่านี้" แล้ว agent ตัวไหนที่พูด MCP ได้ก็ใช้ได้ทันที
 
-บทนี้เขียน MCP server เองด้วย Python stdlib ล้วน (ไม่ใช้ SDK) จึงเห็นทุกข้อความที่วิ่งไปมา โค้ดอยู่ที่ `labs/mcp_server/server.py` ราว 202 บรรทัด
+บทนี้เขียน MCP server เองด้วย Python stdlib ล้วน (ไม่ใช้ SDK) จึงเห็นทุกข้อความที่วิ่งไปมา โค้ดอยู่ที่ `labs/mcp_server/server.py` ราว 217 บรรทัด
 
 ---
 
@@ -21,6 +21,16 @@
 | request | `{"jsonrpc": "2.0", "id": 1, "method": "...", "params": {...}}` | ต้อง — ด้วย `id` เดิม |
 | response | `{"jsonrpc": "2.0", "id": 1, "result": {...}}` หรือ `"error": {"code", "message"}` | — |
 | notification | `{"jsonrpc": "2.0", "method": "..."}` (**ไม่มี** `id`) | ห้ามตอบ |
+
+error code มาตรฐานที่ server นี้ใช้:
+
+| code | ความหมาย | ตัวอย่าง |
+|---|---|---|
+| `-32700` | parse error — ไม่ใช่ JSON | `hello?` |
+| `-32600` | invalid request — JSON ถูก แต่ไม่ใช่ request | array (batch) หรือ object ที่ไม่มี `method` |
+| `-32601` | method not found | `resources/list` |
+| `-32602` | invalid params | `params` ไม่ใช่ object, tool ที่ไม่มีอยู่ |
+| `-32603` | internal error | bug ใน handler |
 
 server ที่มีแค่ tool ต้องรู้จัก 4 method:
 
@@ -113,7 +123,7 @@ def handle(msg: dict) -> dict | None:
     return {"jsonrpc": "2.0", "id": msg["id"], "result": result}
 ```
 
-สองชั้นที่กันไม่ให้ server ตาย: `params` ที่ไม่ใช่ object ได้ `-32602` และ bug ใด ๆ ใน handler ได้ `-32603` (internal error) แทนการ crash (test `test_bad_params_keep_running`)
+หลายชั้นที่กันไม่ให้ server ตาย: ข้อความที่ไม่ใช่ request ได้ `-32600`, `params` ที่ไม่ใช่ object ได้ `-32602` และ bug ใด ๆ ใน handler ได้ `-32603` (internal error) แทนการ crash (test `test_invalid_request`, `test_bad_params_keep_running`)
 
 `initialize` ตอบ `protocolVersion` ที่ client ขอ ถ้า server รองรับ (มีรายการใน `SUPPORTED`) ไม่งั้นตอบเวอร์ชันล่าสุดที่ตัวเองมี แล้วให้ client ตัดสินใจเองว่าจะคุยต่อไหม
 
